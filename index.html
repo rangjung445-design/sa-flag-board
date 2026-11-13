@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SA Counsellor Flag Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* ---------- COLOURS (light and dark mode) ---------- */
+  :root {
+    --page: #f5f7f6;  --panel: #ffffff;  --ink: #1d2b2c;  --muted: #5b6b6c;  --line: #d9e0de;
+    --urgent: #b42318; --urgent-bg: #fde8e6;
+    --high: #9a4a07;   --high-bg: #fdf0dc;
+    --review: #2f5f86; --review-bg: #e6eff7;
+    --none: #5b6b6c;   --none-bg: #eef1f0;
+    --accent: #1f5c55;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #121a1b; --panel: #1a2425; --ink: #e8eeed; --muted: #9fb0af; --line: #2e3b3c;
+      --urgent: #ff8a7a; --urgent-bg: #3d1714;
+      --high: #f5b971;   --high-bg: #3a2810;
+      --review: #8ec1ea; --review-bg: #172b3b;
+      --none: #9fb0af;   --none-bg: #222d2e;
+      --accent: #7fd1c4;
+    }
+  }
+
+  /* ---------- BASIC LAYOUT ---------- */
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink);
+         font: 16px/1.5 "Atkinson Hyperlegible", system-ui, sans-serif; }
+  header { padding: 24px 20px 0; max-width: 1200px; margin: 0 auto; }
+  h1 { margin: 0; font-size: 1.6rem; }
+  .sub { color: var(--muted); margin: 4px 0 16px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 0 20px 40px; }
+
+  /* Tabs to switch between the two views */
+  .tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--line); }
+  .tabs button { background: none; border: 0; padding: 10px 16px; font: inherit; font-weight: 700;
+                 color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Summary numbers at the top of the counsellor view */
+  .summary { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+  .summary div { padding: 8px 14px; border-radius: 6px; font-weight: 700; }
+
+  /* Filters */
+  .filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+  .filters label { display: flex; flex-direction: column; font-size: .85rem; color: var(--muted); }
+  select, input { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px;
+                  background: var(--panel); color: var(--ink); }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: .85rem; color: var(--muted); background: var(--panel); position: sticky; top: 0; }
+  td.num, th.num { text-align: right; }
+  .comment { color: var(--muted); font-style: italic; max-width: 260px; }
+
+  /* Flag badges */
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-weight: 700; font-size: .9rem; white-space: nowrap; }
+  .Urgent { color: var(--urgent); background: var(--urgent-bg); }
+  .High   { color: var(--high);   background: var(--high-bg); }
+  .Review { color: var(--review); background: var(--review-bg); }
+  .None   { color: var(--none);   background: var(--none-bg); }
+
+  /* AC-03: Urgent rows must be impossible to miss */
+  tr.urgent-row td { background: var(--urgent-bg); }
+  tr.urgent-row td:first-child { border-left: 8px solid var(--urgent); }
+  tr.urgent-row .badge { background: var(--urgent); color: #fff; font-size: 1rem; }
+
+  .note { color: var(--muted); font-size: .9rem; }
+  #loader { background: var(--panel); border: 2px dashed var(--line); padding: 24px; border-radius: 6px; margin-top: 16px; }
+  .hidden { display: none; }
+
+  /* Mobile: stack the table into cards on small screens */
+  @media (max-width: 700px) {
+    #counsellorTable thead { display: none; }
+    #counsellorTable tr { display: block; border-bottom: 2px solid var(--line); padding: 8px 0; }
+    #counsellorTable td { display: block; border: 0; padding: 4px 12px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Situational Analysis flag board</h1>
+  <p class="sub">Synthetic data only. Students are shown by ID, school and class. No names are stored.</p>
+  <nav class="tabs">
+    <button id="tabCounsellor" class="active" onclick="showView('counsellor')">Counsellor view</button>
+    <button id="tabSupervisor" onclick="showView('supervisor')">Supervisor view</button>
+  </nav>
+</header>
+
+<main>
+  <!-- Shown only if the CSV could not be loaded automatically -->
+  <div id="loader" class="hidden">
+    <p><strong>Choose the survey file to begin.</strong> Select <em>SA_sample_dataset_SYNTHETIC.csv</em>.</p>
+    <input type="file" accept=".csv" onchange="loadFromFile(this.files[0])">
+  </div>
+
+  <!-- ===== COUNSELLOR VIEW ===== -->
+  <section id="counsellorView">
+    <div class="summary" id="summary"></div>
+    <div class="filters">
+      <label>Search ID <input id="fSearch" placeholder="e.g. S-014" oninput="drawCounsellor()"></label>
+      <label>School <select id="fSchool" onchange="drawCounsellor()"></select></label>
+      <label>Class <select id="fClass" onchange="drawCounsellor()"></select></label>
+      <label>Flag <select id="fFlag" onchange="drawCounsellor()">
+        <option value="">All</option><option>Urgent</option><option>High</option><option>Review</option><option>None</option>
+      </select></label>
+    </div>
+    <div class="table-wrap">
+      <table id="counsellorTable">
+        <thead><tr><th>Flag</th><th>Why</th><th>Student</th><th>School</th><th>Class</th><th>Comment</th><th>Follow-up</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="note">Follow-up status is saved in this browser and stays after a page refresh.</p>
+  </section>
+
+  <!-- ===== SUPERVISOR VIEW (no student IDs) ===== -->
+  <section id="supervisorView" class="hidden">
+    <p class="note" style="margin-top:16px">Counts only. No student IDs are shown. Any count from 1 to 4 appears as “&lt;5” so small groups cannot be identified.</p>
+    <div class="table-wrap">
+      <table id="supervisorTable">
+        <thead><tr><th>School</th><th>Class</th><th class="num">Students</th><th class="num">Urgent</th><th class="num">High</th><th class="num">Review</th><th class="num">None</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+/* =========================================================
+   SETTINGS — easy things to change
+   ========================================================= */
+const CSV_FILE = "SA_sample_dataset_SYNTHETIC.csv";
+const USE_EXTRA_RULE = true;   // my extra rule (AC-08). Set to false to use only the baseline rules.
+const SMALL_GROUP = 5;         // counts below this are hidden as "<5" in the supervisor view
+const FLAG_ORDER = ["Urgent", "High", "Review", "None"];
+
+let students = [];             // all students after loading and cleaning
+
+/* =========================================================
+   STEP 1 — LOAD THE CSV
+   Try to read the file from the same folder. If the browser
+   blocks that (e.g. opened by double-click), show a file picker.
+   ========================================================= */
+fetch(CSV_FILE)
+  .then(r => { if (!r.ok) throw new Error(); return r.text(); })
+  .then(start)
+  .catch(() => document.getElementById("loader").classList.remove("hidden"));
+
+function loadFromFile(file) {
+  file.text().then(text => {
+    document.getElementById("loader").classList.add("hidden");
+    start(text);
+  });
+}
+
+function start(csvText) {
+  students = parseCSV(csvText).map(cleanRow);
+  students.forEach(s => Object.assign(s, flagStudent(s)));
+  fillFilterMenus();
+  drawCounsellor();
+  drawSupervisor();
+}
+
+/* Turn CSV text into a list of objects, one per row. Handles quoted commas. */
+function parseCSV(text) {
+  const lines = text.replace(/\r/g, "").split("\n").filter(l => l.trim() !== "");
+  const headers = splitLine(lines[0]);
+  return lines.slice(1).map(line => {
+    const cells = splitLine(line), row = {};
+    headers.forEach((h, i) => row[h.trim()] = (cells[i] || "").trim());
+    return row;
+  });
+}
+function splitLine(line) {
+  const out = []; let cur = "", inQuotes = false;
+  for (const ch of line) {
+    if (ch === '"') inQuotes = !inQuotes;
+    else if (ch === "," && !inQuotes) { out.push(cur); cur = ""; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+/* =========================================================
+   STEP 2 — CLEAN THE DATA
+   Real survey data is messy (e.g. "often" vs "Often", blank answers).
+   We fix capitalisation and turn numbers into real numbers.
+   A blank stays blank (null) so it never counts as a risk by accident.
+   ========================================================= */
+function tidyWord(v) {
+  v = (v || "").trim().toLowerCase();
+  if (v === "") return null;
+  if (v === "prefer not to say") return "Prefer not to say";
+  return v.charAt(0).toUpperCase() + v.slice(1);   // "often" -> "Often"
+}
+function tidyNumber(v) {
+  const n = parseInt(v, 10);
+  return (n >= 1 && n <= 4) ? n : null;            // anything outside 1–4 counts as missing
+}
+function cleanRow(r) {
+  return {
+    id: r.student_id, school: r.school, cls: r.class,
+    q1: tidyNumber(r.q1_sleep_well),
+    q2: tidyNumber(r.q2_safe_at_home),
+    q3: tidyWord(r.q3_bullied),
+    q4: tidyWord(r.q4_trusted_adult),
+    q5: tidyWord(r.q5_sad_most_days),
+    q6: tidyWord(r.q6_thoughts_of_self_harm),
+    q7: tidyWord(r.q7_wants_counsellor),
+    comment: r.comment || ""
+  };
+}
+
+/* =========================================================
+   STEP 3 — THE FLAG RULES (in order; first match wins)
+   1. Urgent : q6 = Yes
+   (extra)   High : q6 = Prefer not to say   <-- my extra rule
+   2. High   : q3 = Often, or q2 = 1
+   3. Review : any two of (q1 <= 2, q5 = Yes, q4 = No), or q7 = Yes
+   4. None   : everything else
+   ========================================================= */
+function flagStudent(s) {
+  // Rule 1 — Urgent
+  if (s.q6 === "Yes") return result("Urgent", ["Reported thoughts of self-harm"]);
+
+  // Rule 2 — High (plus my extra rule)
+  const high = [];
+  if (USE_EXTRA_RULE && s.q6 === "Prefer not to say") high.push("Chose not to answer the self-harm question");
+  if (s.q3 === "Often") high.push("Bullied often");
+  if (s.q2 === 1) high.push("Never feels safe at home");
+  if (high.length) return result("High", high);
+
+  // Rule 3 — Review
+  const signs = [];
+  if (s.q1 !== null && s.q1 <= 2) signs.push("Poor sleep");
+  if (s.q5 === "Yes") signs.push("Sad most days");
+  if (s.q4 === "No") signs.push("No trusted adult");
+  const review = [];
+  if (signs.length >= 2) review.push(signs.join(" + "));
+  if (s.q7 === "Yes") review.push("Asked to see the counsellor");
+  if (review.length) return result("Review", review);
+
+  // Rule 4 — None
+  return result("None", ["No rule matched"]);
+
+  function result(level, reasons) {
+    const missing = ["q1","q2","q3","q4","q5","q6","q7"].filter(q => s[q] === null);
+    if (missing.length) reasons.push("Missing answer: " + missing.join(", ") + " (check paper form)");
+    return { flag: level, reasons };
+  }
+}
+
+/* =========================================================
+   STEP 4 — FOLLOW-UP STATUS (saved in the browser = survives refresh)
+   ========================================================= */
+const STATUS_KEY = "sa-followup-status";
+function loadStatuses() {
+  try { return JSON.parse(localStorage.getItem(STATUS_KEY)) || {}; } catch { return {}; }
+}
+function saveStatus(id, value) {
+  const all = loadStatuses();
+  all[id] = value;
+  try { localStorage.setItem(STATUS_KEY, JSON.stringify(all)); } catch {}
+  drawCounsellor();
+}
+
+/* =========================================================
+   STEP 5 — DRAW THE COUNSELLOR VIEW
+   ========================================================= */
+function fillFilterMenus() {
+  const fill = (id, values) => {
+    document.getElementById(id).innerHTML =
+      '<option value="">All</option>' + values.map(v => `<option>${v}</option>`).join("");
+  };
+  fill("fSchool", [...new Set(students.map(s => s.school))].sort());
+  fill("fClass",  [...new Set(students.map(s => s.cls))]);
+}
+
+function drawCounsellor() {
+  const search = document.getElementById("fSearch").value.trim().toLowerCase();
+  const school = document.getElementById("fSchool").value;
+  const cls    = document.getElementById("fClass").value;
+  const flag   = document.getElementById("fFlag").value;
+  const statuses = loadStatuses();
+
+  // Summary chips (all students)
+  document.getElementById("summary").innerHTML = FLAG_ORDER.map(f =>
+    `<div class="${f}">${f}: ${students.filter(s => s.flag === f).length}</div>`).join("");
+
+  // Filter, then sort: Urgent first, then High, Review, None; then by ID
+  const list = students
+    .filter(s => (!search || s.id.toLowerCase().includes(search)) &&
+                 (!school || s.school === school) &&
+                 (!cls || s.cls === cls) &&
+                 (!flag || s.flag === flag))
+    .sort((a, b) => FLAG_ORDER.indexOf(a.flag) - FLAG_ORDER.indexOf(b.flag) || a.id.localeCompare(b.id));
+
+  document.querySelector("#counsellorTable tbody").innerHTML = list.map(s => {
+    const status = statuses[s.id] || "Not started";
+    const followUp = s.flag === "None" ? '<span class="note">Not needed</span>' :
+      `<select onchange="saveStatus('${s.id}', this.value)" aria-label="Follow-up for ${s.id}">
+        ${["Not started", "In progress", "Closed"].map(o => `<option ${o === status ? "selected" : ""}>${o}</option>`).join("")}
+       </select>`;
+    return `<tr class="${s.flag === "Urgent" ? "urgent-row" : ""}">
+      <td><span class="badge ${s.flag}">${s.flag === "Urgent" ? "⚠ Urgent" : s.flag}</span></td>
+      <td>${s.reasons.join("<br>")}</td>
+      <td><strong>${s.id}</strong></td><td>${s.school}</td><td>${s.cls}</td>
+      <td class="comment">${escapeHTML(s.comment)}</td>
+      <td>${followUp}</td></tr>`;
+  }).join("") || '<tr><td colspan="7">No students match these filters.</td></tr>';
+}
+
+/* =========================================================
+   STEP 6 — DRAW THE SUPERVISOR VIEW (counts only, small numbers hidden)
+   ========================================================= */
+function hideSmall(n) { return (n > 0 && n < SMALL_GROUP) ? "&lt;5" : n; }
+
+function drawSupervisor() {
+  const groups = {};
+  students.forEach(s => {
+    const key = s.school + "|" + s.cls;
+    groups[key] = groups[key] || { school: s.school, cls: s.cls, total: 0, Urgent: 0, High: 0, Review: 0, None: 0 };
+    groups[key].total++;
+    groups[key][s.flag]++;
+  });
+  document.querySelector("#supervisorTable tbody").innerHTML = Object.values(groups).map(g =>
+    `<tr><td>${g.school}</td><td>${g.cls}</td><td class="num">${hideSmall(g.total)}</td>
+     ${FLAG_ORDER.map(f => `<td class="num">${hideSmall(g[f])}</td>`).join("")}</tr>`).join("");
+}
+
+/* =========================================================
+   Small helpers
+   ========================================================= */
+function showView(name) {
+  document.getElementById("counsellorView").classList.toggle("hidden", name !== "counsellor");
+  document.getElementById("supervisorView").classList.toggle("hidden", name !== "supervisor");
+  document.getElementById("tabCounsellor").classList.toggle("active", name === "counsellor");
+  document.getElementById("tabSupervisor").classList.toggle("active", name === "supervisor");
+}
+function escapeHTML(t) {
+  return t.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+</script>
+</body>
+</html>
