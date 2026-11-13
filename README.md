@@ -7,7 +7,7 @@ A small web page that reads the Situational Analysis survey file, flags students
 ```
 python3 -m http.server 8000
 ```
-Then open http://localhost:8000 in a browser.
+Then open https://rangjung445-design.github.io/sa-flag-board/ in a browser.
 No Python? Double-click `index.html` and choose `SA_sample_dataset_SYNTHETIC.csv` when asked.
 **Live link:** _add your GitHub Pages link here_
 
