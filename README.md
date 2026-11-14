@@ -25,7 +25,7 @@ No Python? Double-click `index.html` and choose `SA_sample_dataset_SYNTHETIC.csv
 ## Rules and assumptions
 - Baseline rules applied in order; the first match sets the flag. All matching reasons are shown.
 - **Data cleaning:** answers are tidied ("often" → "Often"). A blank or out-of-range answer counts as missing, never as a risk, and is shown as "Missing answer: q1 (check paper form)" (e.g. S-010).
-- **Extra rule (AC-08):** if a student answers "Prefer not to say" to the self-harm question, they are flagged **High**, not None. The baseline rules ignore this answer, so 9 students would have been invisible. A student who avoids this question may be the one who most needs a quiet check-in. It can be switched off with `USE_EXTRA_RULE = false` in `index.html`.
+- **Extra rule (AC-08):** if a student answers "Prefer not to say" to the self-harm question, they are flagged **High**, not None. The baseline rules ignore this answer, so 8 students would have been invisible. A student who avoids this question may be the one who most needs a quiet check-in. It can be switched off with `USE_EXTRA_RULE = false` in `index.html`.
 - Supervisor view: any count from 1 to 4 is shown as "<5"; zero is shown as 0.
 
 ## Gaps I noticed in the brief
